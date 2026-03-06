@@ -1,6 +1,6 @@
 use crate::types::Keycode;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -12,11 +12,14 @@ pub struct Config {
 
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
-        let mut ids = HashSet::new();
+        let mut ids: HashMap<_, Vec<_>> = HashMap::new();
         let mut modifier_keys: HashSet<Keycode> = HashSet::new();
         let mut groups = HashSet::new();
         for modifier in &self.modifiers {
-            if !ids.insert(modifier.id.clone()) {
+            if ids
+                .insert(modifier.id.clone(), modifier.keys.iter().collect())
+                .is_some()
+            {
                 Err(format!("duplicate modifiers for \"{}\"", modifier.id))?;
             }
             let mut group: Vec<Keycode> = modifier.keys.iter().cloned().collect();
@@ -40,7 +43,11 @@ impl Config {
             }
             let mut modifiers = HashSet::new();
             for combo in &action.modified {
-                if !ids.contains(&combo.modifier) {
+                if let Some(group) = ids.get(&combo.modifier) {
+                    if group.contains(&&action.key) {
+                        Err(format!("key \"{}\" is a modifier to itself", action.key))?;
+                    }
+                } else {
                     Err(format!(
                         "undefined modifier \"{}\" in key \"{}\"",
                         &combo.modifier, action.key

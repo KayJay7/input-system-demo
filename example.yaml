@@ -5,6 +5,7 @@ modifiers:
     keys: [ LAlt ]
   - name: RCtrl
     keys: [ RCtrl ]
+    masking: true
   - name: CtrlAlt
     keys:
       - LCtrl
@@ -18,6 +19,9 @@ modifiers:
 actions:
   - key: LCtrl
     immediate: true
+    action: Q
+  - key: LAlt
+    action: H
   - key: A
     action: Z
   - key: B

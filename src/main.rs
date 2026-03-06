@@ -1,7 +1,7 @@
 use input_system_demo::combo::ComboHandler;
 use input_system_demo::config::Config;
-use input_system_demo::types::Event;
 use input_system_demo::types;
+use input_system_demo::types::Event;
 use sdl3::event;
 use sdl3::hint;
 use sdl3::joystick::JoystickId;
@@ -24,11 +24,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let gamepad_subsystem = sdl_context.gamepad()?;
 
     hint::set("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");
-    let window = video_subsystem
+    let mut window = video_subsystem
         .window("Input Tracker", 100, 100)
         .set_flags(WindowFlags::ALWAYS_ON_TOP)
         .position_centered()
         .build()?;
+    // window.set_keyboard_grab(true);
     // Using a canvas ensures the window is actually refreshed
     // and recognized by the OS as an active process.
     let mut canvas = window.into_canvas();
@@ -59,12 +60,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     repeat: false,
                     ..
                 } => {
-                    println!("{timestamp}: {key} down on keyboard");
-                    combo_handler.handle(Event {
+                    // println!("{timestamp}: {key} down on keyboard");
+                    let queue = combo_handler.handle(Event {
                         keycode: key.into(),
-                        state: types::State::Down,
+                        kind: types::Kind::Down,
                         value: 0,
                     });
+                    println!("{}", queue.len());
+                    while let Some(event) = queue.pop_front() {
+                        println!("{event:?}");
+                    }
                 }
 
                 event::Event::KeyUp {
@@ -73,12 +78,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     repeat: false,
                     ..
                 } => {
-                    println!("{timestamp}: {key} up on keyboard");
-                    combo_handler.handle(Event {
+                    // println!("{timestamp}: {key} up on keyboard");
+                    let queue = combo_handler.handle(Event {
                         keycode: key.into(),
-                        state: types::State::Up,
+                        kind: types::Kind::Up,
                         value: 0,
                     });
+                    println!("{}", queue.len());
+                    while let Some(event) = queue.pop_front() {
+                        println!("{event:?}");
+                    }
                 }
 
                 // --- Gamepad Connection (using Controller nomenclature) ---
@@ -105,13 +114,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     which,
                     timestamp,
                 } => {
-                    println!("{timestamp}: {button:?} down on {which}");
+                    // println!("{timestamp}: {button:?} down on {which}");
 
-                    combo_handler.handle(Event {
+                    let queue = combo_handler.handle(Event {
                         keycode: button.into(),
-                        state: types::State::Down,
+                        kind: types::Kind::Down,
                         value: 0,
                     });
+                    println!("{}", queue.len());
+                    while let Some(event) = queue.pop_front() {
+                        println!("{event:?}");
+                    }
                 }
 
                 event::Event::ControllerButtonUp {
@@ -119,22 +132,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     which,
                     timestamp,
                 } => {
-                    println!("{timestamp}: {button:?} up on {which}");
+                    // println!("{timestamp}: {button:?} up on {which}");
 
-                    combo_handler.handle(Event {
+                    let queue = combo_handler.handle(Event {
                         keycode: button.into(),
-                        state: types::State::Up,
+                        kind: types::Kind::Up,
                         value: 0,
                     });
+                    println!("{}", queue.len());
+                    while let Some(event) = queue.pop_front() {
+                        println!("{event:?}");
+                    }
                 }
 
                 event::Event::ControllerAxisMotion { axis, value, .. } => {
                     //println!("{timestamp}: {axis:?}={value:?} on {which}");
-                    combo_handler.handle(Event {
+                    let queue = combo_handler.handle(Event {
                         keycode: axis.into(),
-                        state: types::State::Axis,
+                        kind: types::Kind::Axis,
                         value,
                     });
+                    println!("{}", queue.len());
+                    while let Some(event) = queue.pop_front() {
+                        println!("{event:?}");
+                    }
                 }
 
                 _ => {}

@@ -5,7 +5,7 @@ use frozen_collections::Scalar;
 use sdl3::keyboard;
 
 #[derive(Copy, Clone, Debug)]
-pub enum State {
+pub enum Kind {
     Up,
     Down,
     Axis,
@@ -14,7 +14,7 @@ pub enum State {
 #[derive(Copy, Clone, Debug)]
 pub struct Event {
     pub keycode: Keycode,
-    pub state: State,
+    pub kind: Kind,
     pub value: i16,
 }
 

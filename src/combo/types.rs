@@ -72,11 +72,12 @@ pub struct Key {
     // key: Keycode,              // validate mphf
     pub action: Option<Keycode>,      // action key: unmodified action
     pub combos: Range,                // action key: modified mappings
-    pub active_action: Option<usize>, // action key: active action
+    pub active_combo: Option<usize>, // action key: active action
     pub latching: bool,               // action key: after modifier deactivation
     pub immediate: bool,              // modifier key: keydown immediately
     pub groups: Range,                // modifier key: superset modifier groups
     pub open: bool,                   // modifier key: no action yet
+    pub cache_counter: i32,
 }
 
 impl Key {
