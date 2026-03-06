@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+sdl3 = {version = "0.17.3", features = []}
+serde_yaml = "0.9.34"
+serde = { version = "1.0.228", features = ["derive"] }
+frozen-collections = "0.9.1"
+tinyset = "0.5.2"
+#bitmaps = "3.2.1"
