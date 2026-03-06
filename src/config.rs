@@ -1,22 +1,6 @@
-use crate::types::keys::Keycode;
+use crate::types::Keycode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-
-pub mod keys;
-
-#[derive(Copy, Clone, Debug)]
-pub enum State {
-    Up,
-    Down,
-    Axis,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Event {
-    pub keycode: Keycode,
-    pub state: State,
-    pub value: i16,
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -24,34 +8,6 @@ pub struct Config {
     pub modifiers: Vec<ModifierDecl>,
     #[serde(default = "Vec::default")]
     pub actions: Vec<Action>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Action {
-    pub key: Keycode,
-    #[serde(default = "Option::default")]
-    pub action: Option<Keycode>,
-    #[serde(default = "bool::default")]
-    pub immediate: bool,
-    #[serde(default = "Vec::default")]
-    pub modified: Vec<Combo>,
-    #[serde(default = "bool::default")]
-    pub latching: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Combo {
-    pub modifier: String,
-    pub action: Keycode,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ModifierDecl {
-    #[serde(rename = "name")]
-    pub id: String,
-    pub keys: HashSet<Keycode>,
-    #[serde(default = "bool::default")]
-    pub masking: bool,
 }
 
 impl Config {
@@ -100,4 +56,32 @@ impl Config {
         }
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Action {
+    pub key: Keycode,
+    #[serde(default = "Option::default")]
+    pub action: Option<Keycode>,
+    #[serde(default = "bool::default")]
+    pub immediate: bool,
+    #[serde(default = "Vec::default")]
+    pub modified: Vec<Combo>,
+    #[serde(default = "bool::default")]
+    pub latching: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Combo {
+    pub modifier: String,
+    pub action: Keycode,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ModifierDecl {
+    #[serde(rename = "name")]
+    pub id: String,
+    pub keys: HashSet<Keycode>,
+    #[serde(default = "bool::default")]
+    pub masking: bool,
 }

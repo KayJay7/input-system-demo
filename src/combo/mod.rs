@@ -1,91 +1,24 @@
-use crate::types::keys::Keycode;
-use crate::types::{Config, Event, State};
-use frozen_collections::{FzScalarMap, FzScalarSet};
-use std::cmp::Ordering;
+use crate::combo::types::{Combo, Group, Key, Range};
+use crate::config::Config;
+use crate::types::Keycode;
+use crate::types::{Event, State};
+use frozen_collections::FzScalarMap;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tinyset::SetUsize;
 
+mod types;
+
 const EVENT_BUFFER_WARMUP: usize = 16;
-
-#[derive(Debug, Clone)]
-struct Group {
-    index: usize,                // index of self (for partial ordering)
-    greater: FzScalarSet<usize>, // supergroups
-    pred: Box<[usize]>,          // neighboring subgroups
-    intersect: Box<[usize]>,     // unordered intersectors
-    active_combos: SetUsize,     // currently down combos
-    counter: usize,              // #currently down modifier keys
-    size: usize,                 // #modifiers
-    mask_weight: i32,            // #(1?)-masking subgroups
-    keys: Box<[usize]>,
-    mask: bool,
-}
-
-impl Group {
-    fn is_active(&self) -> bool {
-        self.counter == self.size
-    }
-}
-
-impl PartialEq for Group {
-    fn eq(&self, other: &Self) -> bool {
-        self.index == other.index
-    }
-}
-impl PartialOrd for Group {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self == other {
-            return Some(Ordering::Equal);
-        }
-        if self.greater.contains(&other.index) {
-            return Some(Ordering::Less);
-        }
-        if other.greater.contains(&self.index) {
-            return Some(Ordering::Greater);
-        }
-        None
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-struct Key {
-    // key: Keycode,                 // validate mphf
-    action: Option<Keycode>,      // action key: unmodified action
-    combos: Box<[Combo]>,         // action key: modified mappings
-    active_action: Option<usize>, // action key: active action
-    latching: bool,               // action key: after modifier deactivation
-    immediate: bool,              // modifier key: keydown immediately
-    groups: Box<[usize]>,         // modifier key: superset modifier groups
-    open: bool,                   // modifier key: no action yet
-}
-
-impl Key {
-    #[inline]
-    fn is_modifier(&self) -> bool {
-        !self.groups.is_empty()
-    }
-
-    #[inline]
-    fn is_action(&self) -> bool {
-        !self.combos.is_empty() || self.action.is_some()
-    }
-
-    #[inline]
-    fn is_immediate(&self) -> bool {
-        !self.is_modifier() || self.immediate
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Combo {
-    action: Keycode,       // target action
-    modifier_group: usize, // modifier group index
-}
 
 pub struct ComboHandler {
     domain: FzScalarMap<Keycode, usize>, // keycode to key index
     keys: Box<[Key]>,                    // keys
+    keys_combos: Box<[Combo]>,           // optimization: packed key combos
+    keys_groups: Box<[usize]>,           // optimization: packed key groups
     groups: Box<[Group]>,                // modifier groups graph
+    groups_keys: Box<[usize]>,           // optimization: packed group keys
+    groups_pred: Box<[usize]>,        // optimization: packed group pred adjacency lists
+    groups_intersect: Box<[usize]>,   // optimization: packed group intersect adjacency lists
     masks: i32,                          // #active masks
     events: VecDeque<Event>,             // output event queue
 }
@@ -106,19 +39,32 @@ impl ComboHandler {
             groups: Vec<usize>,
         }
         impl MutKey {
-            fn freeze(mut self, groups: &Box<[Group]>) -> Key {
+            fn freeze(
+                mut self,
+                groups: &[Group],
+                keys_combos: &mut Vec<Combo>,
+                keys_groups: &mut Vec<usize>,
+            ) -> Key {
                 self.combos.sort_unstable_by(|x, y| {
                     groups[y.modifier_group]
                         .size
                         .cmp(&groups[x.modifier_group].size)
                 });
+                let combos_start = keys_combos.len();
+                keys_combos.extend(self.combos);
+                let combos_end = keys_combos.len();
+
+                let groups_start = keys_groups.len();
+                keys_groups.extend(self.groups);
+                let groups_end = keys_groups.len();
+
                 Key {
                     action: self.action,
-                    combos: self.combos.into_boxed_slice(),
+                    combos: Range::new(combos_start, combos_end),
                     active_action: None,
                     latching: self.latching,
                     immediate: self.immediate,
-                    groups: self.groups.into_boxed_slice(),
+                    groups: Range::new(groups_start, groups_end),
                     open: false,
                 }
             }
@@ -133,17 +79,35 @@ impl ComboHandler {
             mask: bool,
         }
 
-        impl Into<Group> for MutGroup {
-            fn into(self) -> Group {
+        impl MutGroup {
+            fn freeze(
+                self,
+                groups_pred: &mut Vec<usize>,
+                groups_intersect: &mut Vec<usize>,
+                groups_keys: &mut Vec<usize>,
+            ) -> Group {
+                let pred_start = groups_pred.len();
+                groups_pred.extend(self.pred);
+                let pred_end = groups_pred.len();
+
+                let intersect_start = groups_intersect.len();
+                groups_intersect.extend(self.intersect);
+                let intersect_end = groups_intersect.len();
+
+                let keys_start = groups_keys.len();
+                groups_keys.extend(self.keys);
+                let keys_end = groups_keys.len();
+                let keys = Range::new(keys_start, keys_end);
+
                 Group {
                     index: self.index,
                     greater: self.greater.into_iter().collect(),
-                    pred: self.pred.into_boxed_slice(),
-                    intersect: self.intersect.into_boxed_slice(),
+                    pred: Range::new(pred_start, pred_end),
+                    intersect: Range::new(intersect_start, intersect_end),
                     active_combos: SetUsize::new(),
                     counter: 0,
-                    size: self.keys.len(),
-                    keys: self.keys.into_boxed_slice(),
+                    size: keys.len(),
+                    keys,
                     mask: self.mask,
                     mask_weight: 0,
                 }
@@ -187,8 +151,6 @@ impl ComboHandler {
             }
         }
 
-        edges
-
         let mut domain: HashMap<Keycode, usize> = HashMap::new();
         let mut temp_keys: Vec<MutKey> = vec![];
         // domain: populate modifiers
@@ -205,6 +167,9 @@ impl ComboHandler {
             }
         }
 
+        let mut groups_keys = vec![];
+        let mut pred_adjacency = vec![];
+        let mut intersect_adjacency = vec![];
         let mut groups: Box<[Group]> = edges
             .into_iter()
             .enumerate()
@@ -224,14 +189,13 @@ impl ComboHandler {
                     mask: modifier_decl.masking,
                 }
             })
-            .map(MutGroup::into)
+            .map(|group| group.freeze(&mut pred_adjacency, &mut intersect_adjacency, &mut groups_keys))
             .collect();
 
         for group in 0..groups.len() {
             groups[group].mask_weight = groups[group].mask as i32
                 - groups[group]
-                    .pred
-                    .iter()
+                    .iter_pred(&pred_adjacency)
                     .map(|group| groups[*group].mask as i32)
                     .sum::<i32>();
         }
@@ -263,14 +227,21 @@ impl ComboHandler {
                 )
             }
         }
+        let mut keys_combos = vec![];
+        let mut keys_groups = vec![];
 
         ComboHandler {
             domain: FzScalarMap::new(domain.into_iter().collect()),
             keys: temp_keys
                 .into_iter()
-                .map(|key| key.freeze(&groups))
+                .map(|key| key.freeze(&groups, &mut keys_combos, &mut keys_groups))
                 .collect(),
+            keys_combos: keys_combos.into_boxed_slice(),
+            keys_groups: keys_groups.into_boxed_slice(),
             groups,
+            groups_keys: groups_keys.into_boxed_slice(),
+            groups_pred: pred_adjacency.into_boxed_slice(),
+            groups_intersect: intersect_adjacency.into_boxed_slice(),
             events: VecDeque::with_capacity(EVENT_BUFFER_WARMUP),
             masks: 0,
         }
@@ -286,17 +257,17 @@ impl ComboHandler {
             State::Down => {
                 // modifier key
                 self.keys[key].open = true;
-                for group in &self.keys[key].groups {
+                for group in self.keys[key].iter_groups(&self.keys_groups) {
                     // increase group counter
                     self.groups[*group].counter += 1;
                     if self.groups[*group].is_active() {
                         // for every just activated group
                         self.masks += self.groups[*group].mask_weight;
-                        for key in &self.groups[*group].keys {
+                        for key in self.groups[*group].iter_keys(&self.groups_keys) {
                             // close all modifier keys
                             self.keys[*key].open = false;
                         }
-                        for group in &self.groups[*group].pred {
+                        for group in self.groups[*group].iter_pred(&self.groups_pred) {
                             for key in self.groups[*group].active_combos.drain() {
                                 // terminate the actions it modified
                                 if let Some(action) = self.keys[key].active_action
@@ -304,7 +275,9 @@ impl ComboHandler {
                                 {
                                     // ignore modifiers with keyup action
                                     self.events.push_back(Event {
-                                        keycode: self.keys[key].combos[action].action,
+                                        keycode: self.keys[key]
+                                            .get_combo(action, &self.keys_combos)
+                                            .action,
                                         state: State::Up,
                                         value: 0,
                                     });
@@ -321,19 +294,11 @@ impl ComboHandler {
                 }
 
                 // action key
-                let mut i: usize = 0;
                 let combos = self.keys[key].combos.len();
-                while i < combos
-                    && !self.groups[self.keys[key].combos[i].modifier_group].is_active()
-                {
-                    i += 1;
-                }
-                // ALTERNATIVE BELOW
-                // let i = self.keys[key]
-                //     .combos
-                //     .iter()
-                //     .position(|combo| self.groups[combo.modifier_group].is_active())
-                //     .unwrap_or(combos);
+                let mut i = self.keys[key]
+                    .iter_combos(&self.keys_combos)
+                    .position(|combo| self.groups[combo.modifier_group].is_active())
+                    .unwrap_or(combos);
                 if i == combos {
                     // not modified
                     if let Some(action) = self.keys[key].action
@@ -352,9 +317,16 @@ impl ComboHandler {
 
                 // search action key conflicts
                 while i < combos {
-                    if self.groups[self.keys[key].combos[i].modifier_group].is_active()
-                        && !(self.groups[self.keys[key].combos[i].modifier_group]
-                            <= self.groups[self.keys[key].combos[candidate].modifier_group])
+                    if self.groups[self.keys[key]
+                        .get_combo(i, &self.keys_combos)
+                        .modifier_group]
+                        .is_active()
+                        && !(self.groups[self.keys[key]
+                            .get_combo(i, &self.keys_combos)
+                            .modifier_group]
+                            <= self.groups[self.keys[key]
+                                .get_combo(candidate, &self.keys_combos)
+                                .modifier_group])
                     {
                         if let Some(action) = self.keys[key].action
                             && !self.is_masking()
@@ -372,13 +344,12 @@ impl ComboHandler {
                 }
 
                 // search modifier key conflicts
-                let conflict: bool = self.groups[self.keys[key].combos[candidate].modifier_group]
+                let conflict: bool = self.groups[self.keys[key].get_combo(candidate, &self.keys_combos).modifier_group]
                     .greater
                     .iter()
                     .any(|group| self.groups[*group].is_active()) // no active supergroups
-                    || self.groups[self.keys[key].combos[candidate].modifier_group]
-                    .intersect
-                    .iter()
+                    || self.groups[self.keys[key].get_combo(candidate, &self.keys_combos).modifier_group]
+                    .iter_intersect(&self.groups_intersect)
                     .any(|group| self.groups[*group].is_active()); // no active intersecting groups
                 if conflict
                     && let Some(action) = self.keys[key].action
@@ -394,36 +365,43 @@ impl ComboHandler {
                 }
 
                 // activate combo
-                self.groups[self.keys[key].combos[candidate].modifier_group]
-                    .active_combos
-                    .insert(key);
                 self.keys[key].active_action = Some(candidate);
+                if !self.keys[key].latching {
+                    self.groups[self.keys[key]
+                        .get_combo(candidate, &self.keys_combos)
+                        .modifier_group]
+                        .active_combos
+                        .insert(key);
+                }
                 if self.keys[key].is_immediate() {
                     self.events.push_back(Event {
-                        keycode: self.keys[key].combos[candidate].action,
+                        keycode: self.keys[key]
+                            .get_combo(candidate, &self.keys_combos)
+                            .action,
                         state: State::Down,
                         value: 0,
                     });
                 }
             }
             State::Up => {
-                if self.keys[key].active_action.is_some() || !self.keys[key].is_modifier() {
-                    let mut action = self.keys[key].action;
-                    if let Some(active_action) = self.keys[key].active_action {
-                        self.groups[self.keys[key].combos[active_action].modifier_group]
-                            .active_combos
-                            .remove(key);
-                        self.keys[key].active_action = None;
-                    } else if let Some(action) = self.keys[key].action {
-                    }
 
-                    self.events.push_back(Event {
-                        keycode: self.keys[key].combos[action].action,
-                        state: State::Up,
-                        value: 0,
-                    });
-                } else if self.keys[key].is_modifier() {
-                }
+                // if self.keys[key].active_action.is_some() || !self.keys[key].is_modifier() {
+                //     let mut action = self.keys[key].action;
+                //     if let Some(active_action) = self.keys[key].active_action {
+                //         self.groups[self.keys[key].combos[active_action].modifier_group]
+                //             .active_combos
+                //             .remove(key);
+                //         self.keys[key].active_action = None;
+                //     } else if let Some(action) = self.keys[key].action {
+                //     }
+                //
+                //     self.events.push_back(Event {
+                //         keycode: self.keys[key].combos[action].action,
+                //         state: State::Up,
+                //         value: 0,
+                //     });
+                // } else if self.keys[key].is_modifier() {
+                // }
             }
             State::Axis => {}
         }

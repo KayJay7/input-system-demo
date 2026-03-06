@@ -1,8 +1,22 @@
-use frozen_collections::Scalar;
-use sdl3::gamepad::{Axis, Button};
-use sdl3::keyboard;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use sdl3::gamepad::{Axis, Button};
+use serde::{Deserialize, Serialize};
+use frozen_collections::Scalar;
+use sdl3::keyboard;
+
+#[derive(Copy, Clone, Debug)]
+pub enum State {
+    Up,
+    Down,
+    Axis,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Event {
+    pub keycode: Keycode,
+    pub state: State,
+    pub value: i16,
+}
 
 #[derive(
     Copy, Clone, Debug, Hash, PartialEq, Eq, Deserialize, Serialize, Scalar, Ord, PartialOrd
@@ -293,13 +307,6 @@ pub enum Keycode {
     TriggerRight,
 }
 
-// impl From<u16> for Key {
-//     fn from(key: u16) -> Self {
-//         unsafe { std::mem::transmute(key) }
-//
-//     }
-// }
-
 impl Into<u16> for Keycode {
     fn into(self) -> u16 {
         self as u16
@@ -330,6 +337,7 @@ impl Display for Keycode {
     }
 }
 
+
 impl From<Axis> for Keycode {
     fn from(axis: Axis) -> Self {
         match axis {
@@ -342,6 +350,7 @@ impl From<Axis> for Keycode {
         }
     }
 }
+
 impl From<Button> for Keycode {
     fn from(button: Button) -> Self {
         match button {

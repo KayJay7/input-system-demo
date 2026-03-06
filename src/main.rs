@@ -1,5 +1,7 @@
-use crate::combo::ComboHandler;
-use crate::types::{Config, Event};
+use input_system_demo::combo::ComboHandler;
+use input_system_demo::config::Config;
+use input_system_demo::types::Event;
+use input_system_demo::types;
 use sdl3::event;
 use sdl3::hint;
 use sdl3::joystick::JoystickId;
@@ -7,9 +9,6 @@ use sdl3::keyboard::Keycode;
 use sdl3::video::WindowFlags;
 use std::convert::Into;
 use std::fs::File;
-
-mod combo;
-mod types;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config: Config = serde_yaml::from_reader(File::open("example.yaml")?)?;
