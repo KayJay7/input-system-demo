@@ -3,17 +3,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Config<T:Keycode, U: Keycode> {
+pub struct Config<A:Keycode, Z: Keycode> {
     #[serde(default = "Vec::default")]
-    pub modifiers: Vec<ModifierDecl<T>>,
+    pub modifiers: Vec<ModifierDecl<A>>,
     #[serde(default = "Vec::default")]
-    pub actions: Vec<Action<T, U>>,
+    pub actions: Vec<Action<A, Z>>,
 }
 
-impl<T:Keycode, U:Keycode> Config<T,U> {
+impl<A:Keycode, Z:Keycode> Config<A, Z> {
     pub fn validate(&self) -> Result<(), String> {
         let mut ids: HashMap<_, Vec<_>> = HashMap::new();
-        let mut modifier_keys: HashSet<T> = HashSet::new();
+        let mut modifier_keys: HashSet<A> = HashSet::new();
         let mut groups = HashSet::new();
         for modifier in &self.modifiers {
             if ids
@@ -22,7 +22,7 @@ impl<T:Keycode, U:Keycode> Config<T,U> {
             {
                 Err(format!("duplicate modifiers for \"{}\"", modifier.id))?;
             }
-            let mut group: Vec<T> = modifier.keys.iter().cloned().collect();
+            let mut group: Vec<A> = modifier.keys.iter().cloned().collect();
             group.sort_unstable();
             if !groups.insert(group) {
                 Err(format!("duplicate modifiers for \"{}\"", modifier.id))?;
@@ -66,29 +66,29 @@ impl<T:Keycode, U:Keycode> Config<T,U> {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Action<T:Keycode, U:Keycode> {
-    pub key: T,
+pub struct Action<A:Keycode, Z:Keycode> {
+    pub key: A,
     #[serde(default = "Option::default")]
-    pub action: Option<U>,
+    pub action: Option<Z>,
     #[serde(default = "bool::default")]
     pub immediate: bool,
     #[serde(default = "Vec::default")]
-    pub modified: Vec<Combo<U>>,
+    pub modified: Vec<Combo<Z>>,
     #[serde(default = "bool::default")]
     pub latching: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Combo<U:Keycode> {
+pub struct Combo<Z:Keycode> {
     pub modifier: String,
-    pub action: U,
+    pub action: Z,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ModifierDecl<T:Keycode> {
+pub struct ModifierDecl<A:Keycode> {
     #[serde(rename = "name")]
     pub id: String,
-    pub keys: HashSet<T>,
+    pub keys: HashSet<A>,
     #[serde(default = "bool::default")]
     pub masking: bool,
 }

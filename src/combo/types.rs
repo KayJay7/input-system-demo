@@ -68,9 +68,9 @@ impl PartialOrd for Group {
 }
 
 #[derive(Debug, Clone)]
-pub struct Key<U: Keycode> {
+pub struct Key<Z: Keycode> {
     // key: Keycode,              // validate mphf
-    pub action: Option<U>,      // action key: unmodified action
+    pub action: Option<Z>,      // action key: unmodified action
     pub combos: Range,                // action key: modified mappings
     pub active_combo: Option<usize>, // action key: active action
     pub latching: bool,               // action key: after modifier deactivation
@@ -79,7 +79,7 @@ pub struct Key<U: Keycode> {
     pub open: bool,                   // modifier key: no action yet
     pub cache_counter: i32,
 }
-impl<U:Keycode> Key<U> {
+impl<Z:Keycode> Key<Z> {
     #[inline]
     pub fn is_modifier(&self) -> bool {
         !self.groups.is_empty()
@@ -96,10 +96,10 @@ impl<U:Keycode> Key<U> {
     }
 
     #[inline]
-    pub fn iter_combos<'a, T:Keycode>(
+    pub fn iter_combos<'a>(
         &self,
-        keys_combos: &'a [Combo<T>],
-    ) -> impl Iterator<Item = Combo<T>> + use<'a, T, U> {
+        keys_combos: &'a [Combo<Z>],
+    ) -> impl Iterator<Item = Combo<Z>> + use<'a, Z > {
         self.combos.into_iter().map(|i| keys_combos[i])
     }
 
@@ -107,19 +107,19 @@ impl<U:Keycode> Key<U> {
     pub fn iter_groups<'a>(
         &self,
         keys_groups: &'a [usize],
-    ) -> impl Iterator<Item = &'a usize> + use<'a, U> {
+    ) -> impl Iterator<Item = &'a usize> + use<'a, Z > {
         self.groups.into_iter().map(|i| &keys_groups[i])
     }
 
     #[inline]
-    pub fn get_combo<T:Keycode>(&self, index: usize, keys_combos: &[Combo<T>]) -> Combo<T> {
+    pub fn get_combo(&self, index: usize, keys_combos: &[Combo<Z>]) -> Combo<Z> {
         keys_combos[self.combos.ind(index)]
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Combo<T:Keycode> {
-    pub action: T,       // target action
+pub struct Combo<Z:Keycode> {
+    pub action: Z,       // target action
     pub modifier_group: usize, // modifier group index
 }
 
