@@ -18,29 +18,25 @@ pub struct Group {
 }
 
 impl Group {
-    #[inline]
-    pub fn is_active(&self) -> bool {
+        pub fn is_active(&self) -> bool {
         self.counter == self.size
     }
 
-    #[inline]
-    pub fn iter_intersect<'a>(
+        pub fn iter_intersect<'a>(
         &self,
         groups_intersect: &'a [usize],
     ) -> impl Iterator<Item = &'a usize> + use<'a> {
         self.intersect.into_iter().map(|i| &groups_intersect[i])
     }
 
-    #[inline]
-    pub fn iter_pred<'a>(
+        pub fn iter_pred<'a>(
         &self,
         groups_pred: &'a [usize],
     ) -> impl Iterator<Item = &'a usize> + use<'a> {
         self.pred.into_iter().map(|i| &groups_pred[i])
     }
 
-    #[inline]
-    pub fn iter_keys<'a>(
+        pub fn iter_keys<'a>(
         &self,
         groups_keys: &'a [usize],
     ) -> impl Iterator<Item = &'a usize> + use<'a> {
@@ -80,39 +76,29 @@ pub struct Key<Z: Keycode> {
     pub cache_counter: i32,
 }
 impl<Z:Keycode> Key<Z> {
-    #[inline]
-    pub fn is_modifier(&self) -> bool {
+        pub fn is_modifier(&self) -> bool {
         !self.groups.is_empty()
     }
 
-    // #[inline]
-    // pub fn is_action(&self) -> bool {
-    //     !self.combos.is_empty() || self.action.is_some()
-    // }
-
-    #[inline]
-    pub fn is_immediate(&self) -> bool {
+        pub fn is_immediate(&self) -> bool {
         !self.is_modifier() || self.immediate
     }
 
-    #[inline]
-    pub fn iter_combos<'a>(
+        pub fn iter_combos<'a>(
         &self,
         keys_combos: &'a [Combo<Z>],
     ) -> impl Iterator<Item = Combo<Z>> + use<'a, Z > {
         self.combos.into_iter().map(|i| keys_combos[i])
     }
 
-    #[inline]
-    pub fn iter_groups<'a>(
+        pub fn iter_groups<'a>(
         &self,
         keys_groups: &'a [usize],
     ) -> impl Iterator<Item = &'a usize> + use<'a, Z > {
         self.groups.into_iter().map(|i| &keys_groups[i])
     }
 
-    #[inline]
-    pub fn get_combo(&self, index: usize, keys_combos: &[Combo<Z>]) -> Combo<Z> {
+        pub fn get_combo(&self, index: usize, keys_combos: &[Combo<Z>]) -> Combo<Z> {
         keys_combos[self.combos.ind(index)]
     }
 }
@@ -134,18 +120,15 @@ impl Range {
         Range { start, end }
     }
 
-    #[inline]
-    pub fn is_empty(&self) -> bool {
+        pub fn is_empty(&self) -> bool {
         self.end <= self.start
     }
 
-    #[inline]
-    pub fn len(&self) -> usize {
+        pub fn len(&self) -> usize {
         max(0, self.end - self.start)
     }
 
-    #[inline]
-    pub fn ind(&self, index: usize) -> usize {
+        pub fn ind(&self, index: usize) -> usize {
         assert!(index < self.len());
         self.start + index
     }

@@ -10,6 +10,34 @@ pub struct Config<A:Keycode, Z: Keycode> {
     pub actions: Vec<Action<A, Z>>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Action<A:Keycode, Z:Keycode> {
+    pub key: A,
+    #[serde(default = "Option::default")]
+    pub action: Option<Z>,
+    #[serde(default = "bool::default")]
+    pub immediate: bool,
+    #[serde(default = "Vec::default")]
+    pub modified: Vec<Combo<Z>>,
+    #[serde(default = "bool::default")]
+    pub latching: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Combo<Z:Keycode> {
+    pub modifier: String,
+    pub action: Z,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ModifierDecl<A:Keycode> {
+    #[serde(rename = "name")]
+    pub id: String,
+    pub keys: HashSet<A>,
+    #[serde(default = "bool::default")]
+    pub masking: bool,
+}
+
 impl<A:Keycode, Z:Keycode> Config<A, Z> {
     pub fn validate(&self) -> Result<(), String> {
         let mut ids: HashMap<_, Vec<_>> = HashMap::new();
@@ -63,32 +91,4 @@ impl<A:Keycode, Z:Keycode> Config<A, Z> {
         }
         Ok(())
     }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Action<A:Keycode, Z:Keycode> {
-    pub key: A,
-    #[serde(default = "Option::default")]
-    pub action: Option<Z>,
-    #[serde(default = "bool::default")]
-    pub immediate: bool,
-    #[serde(default = "Vec::default")]
-    pub modified: Vec<Combo<Z>>,
-    #[serde(default = "bool::default")]
-    pub latching: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Combo<Z:Keycode> {
-    pub modifier: String,
-    pub action: Z,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ModifierDecl<A:Keycode> {
-    #[serde(rename = "name")]
-    pub id: String,
-    pub keys: HashSet<A>,
-    #[serde(default = "bool::default")]
-    pub masking: bool,
 }

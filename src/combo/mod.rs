@@ -10,28 +10,26 @@ mod types;
 
 const EVENT_BUFFER_WARMUP: usize = 16;
 
-pub struct ComboHandler<A:Keycode, Z:Keycode> {
-    domain: FzScalarMap<A, usize>, // keycode to key index
-    keys: Box<[Key<Z>]>,                    // keys
-    keys_combos: Box<[Combo<Z>]>,           // optimization: packed key combos
-    keys_groups: Box<[usize]>,           // optimization: packed key groups
-    groups: Box<[Group]>,                // modifier groups graph
-    groups_keys: Box<[usize]>,           // optimization: packed group keys
-    groups_pred: Box<[usize]>,           // optimization: packed group pred
-    groups_intersect: Box<[usize]>,      // optimization: packed group intersect
-    masks: i32,                          // #active masks
-    events: VecDeque<Event<Z>>,             // output event queue
+pub struct ComboHandler<A: Keycode, Z: Keycode> {
+    domain: FzScalarMap<A, usize>,  // keycode to key index
+    keys: Box<[Key<Z>]>,            // keys
+    keys_combos: Box<[Combo<Z>]>,   // optimization: packed key combos
+    keys_groups: Box<[usize]>,      // optimization: packed key groups
+    groups: Box<[Group]>,           // modifier groups graph
+    groups_keys: Box<[usize]>,      // optimization: packed group keys
+    groups_pred: Box<[usize]>,      // optimization: packed group pred
+    groups_intersect: Box<[usize]>, // optimization: packed group intersect
+    masks: i32,                     // #active masks
+    pub events: VecDeque<Event<Z>>, // output event queue
     cache_counter: i32,
 }
 
-impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
-    #[inline]
+impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
     fn is_masking(&self) -> bool {
         self.masks > 0
     }
 
     pub fn new(config: Config<A, Z>) -> ComboHandler<A, Z> {
-        #[derive(Default)]
         struct MutKey<B: Keycode> {
             action: Option<B>,
             combos: Vec<Combo<B>>,
@@ -39,7 +37,20 @@ impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
             immediate: bool,
             groups: Vec<usize>,
         }
-        impl<B:Keycode> MutKey<B> {
+
+        impl<B: Keycode> Default for MutKey<B> {
+            fn default() -> Self {
+                Self {
+                    action: None,
+                    combos: vec![],
+                    latching: false,
+                    immediate: false,
+                    groups: vec![],
+                }
+            }
+        }
+
+        impl<B: Keycode> MutKey<B> {
             fn freeze(
                 mut self,
                 groups: &[Group],
@@ -256,11 +267,11 @@ impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
         }
     }
 
-    pub fn handle(&mut self, event: Event<A>) -> &mut VecDeque<Event<Z>> {
+    pub fn handle(&mut self, event: Event<A>) {
         let key = *if let Some(key) = self.domain.get(&event.keycode) {
             key
         } else {
-            return &mut self.events;
+            return;
         };
         match event.kind {
             Kind::Down => {
@@ -298,7 +309,7 @@ impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
 
                 // optimization: skip conflict resolution on closed keyup modifier keys
                 if !self.keys[key].is_immediate() && !self.keys[key].open {
-                    return &mut self.events;
+                    return;
                 }
 
                 self.keys[key].open &= !self.is_masking();
@@ -318,7 +329,7 @@ impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
                         });
                         self.keys[key].open = true;
                     }
-                    return &mut self.events;
+                    return;
                 }
                 self.keys[key].cache_counter = self.cache_counter;
 
@@ -331,7 +342,7 @@ impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
                 if i == combos {
                     // not modified
                     self.maybe_action(key);
-                    return &mut self.events;
+                    return;
                 }
 
                 let candidate = i;
@@ -350,7 +361,7 @@ impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
                                 .modifier_group])
                     {
                         self.maybe_action(key);
-                        return &mut self.events;
+                        return;
                     }
                     i += 1;
                 }
@@ -376,7 +387,7 @@ impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
                         self.keys[key].active_combo = None;
                         self.keys[key].open = true;
                     }
-                    return &mut self.events;
+                    return;
                 }
 
                 // activate combo
@@ -434,7 +445,6 @@ impl<A:Keycode, Z:Keycode> ComboHandler<A, Z> {
             }
             Kind::Axis => {}
         }
-        &mut self.events
     }
 
     fn maybe_action(&mut self, key: usize) {
