@@ -3,11 +3,13 @@ name = "input-system-demo"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+serde = ["dep:serde"]
+
 [dependencies]
-serde = { version = "1.0.228", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"], optional = true }
 frozen-collections = "0.9.1"
 tinyset = "0.5.2"
-log = "0.4.29"
 
 [dev-dependencies]
 sdl3 = {version = "0.17.3", features = ["ttf"]}
@@ -16,3 +18,4 @@ font-kit = "0.14.3"
 
 [[example]]
 name = "sdl-demo"
+required-features = ["serde"]

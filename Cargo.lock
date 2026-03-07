@@ -319,7 +319,6 @@ version = "0.1.0"
 dependencies = [
  "font-kit",
  "frozen-collections",
- "log",
  "sdl3",
  "serde",
  "serde_yaml",

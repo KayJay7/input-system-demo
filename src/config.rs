@@ -1,8 +1,10 @@
 use crate::types::Keycode;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Config<A:Keycode, Z: Keycode> {
     #[serde(default = "Vec::default")]
     pub modifiers: Vec<ModifierDecl<A>>,
@@ -10,7 +12,8 @@ pub struct Config<A:Keycode, Z: Keycode> {
     pub actions: Vec<Action<A, Z>>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Action<A:Keycode, Z:Keycode> {
     pub key: A,
     #[serde(default = "Option::default")]
@@ -23,13 +26,15 @@ pub struct Action<A:Keycode, Z:Keycode> {
     pub latching: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Combo<Z:Keycode> {
     pub modifier: String,
     pub action: Z,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModifierDecl<A:Keycode> {
     #[serde(rename = "name")]
     pub id: String,

@@ -29,7 +29,7 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
         self.masks > 0
     }
 
-    pub fn new(config: Config<A, Z>) -> ComboHandler<A, Z> {
+    pub fn new(config: &Config<A, Z>) -> ComboHandler<A, Z> {
         struct MutKey<B: Keycode> {
             action: Option<B>,
             combos: Vec<Combo<B>>,
@@ -186,11 +186,11 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
         let mut groups: Box<[Group]> = edges
             .into_iter()
             .enumerate()
-            .zip(config.modifiers)
+            .zip(config.modifiers.iter())
             .map(|((index, (above, below, intersect)), modifier_decl)| {
                 // collect modifier keys
                 let mut keys = Vec::new();
-                for key in modifier_decl.keys {
+                for key in &modifier_decl.keys {
                     keys.push(domain[&key]);
                 }
                 MutGroup {
@@ -214,9 +214,9 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
         for group in 0..groups.len() {
             groups[group].mask_weight = groups[group].mask as i32
                 - groups[group]
-                    .iter_pred(&pred_adjacency)
-                    .map(|group| groups[*group].mask as i32)
-                    .sum::<i32>();
+                .iter_pred(&pred_adjacency)
+                .map(|group| groups[*group].mask as i32)
+                .sum::<i32>();
         }
 
         // domain: populate action keys
@@ -295,7 +295,7 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
                         for group in self.groups[*group].iter_pred(&self.groups_pred) {
                             close_active_combos(
                                 &mut self.groups[*group],
-                                &self.keys,
+                                &mut self.keys,
                                 &self.keys_combos,
                                 &mut self.events,
                             );
@@ -303,9 +303,7 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
                     }
                 }
 
-                if invalidate_cache {
-                    self.cache_counter = self.cache_counter.wrapping_add(1);
-                }
+                self.cache_counter = self.cache_counter.wrapping_add(invalidate_cache as i32);
 
                 // optimization: skip conflict resolution on closed keyup modifier keys
                 if !self.keys[key].is_immediate() && !self.keys[key].open {
@@ -315,12 +313,11 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
                 self.keys[key].open &= !self.is_masking();
 
                 if self.keys[key].cache_counter == self.cache_counter {
-                    if !self.is_masking()
-                        && self.keys[key].is_immediate()
+                    if self.keys[key].is_immediate()
                         && let Some(action) = self.keys[key]
-                            .active_combo
-                            .map(|i| self.keys[key].get_combo(i, &self.keys_combos).action)
-                            .or(self.keys[key].action)
+                        .active_combo
+                        .map(|i| self.keys[key].get_combo(i, &self.keys_combos).action)
+                        .or((!self.is_masking()).then_some(self.keys[key].action).flatten())
                     {
                         self.events.push_back(Event {
                             keycode: action,
@@ -354,11 +351,11 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
                         .modifier_group]
                         .is_active()
                         && !(self.groups[self.keys[key]
-                            .get_combo(i, &self.keys_combos)
-                            .modifier_group]
-                            <= self.groups[self.keys[key]
-                                .get_combo(candidate, &self.keys_combos)
-                                .modifier_group])
+                        .get_combo(i, &self.keys_combos)
+                        .modifier_group]
+                        <= self.groups[self.keys[key]
+                        .get_combo(candidate, &self.keys_combos)
+                        .modifier_group])
                     {
                         self.maybe_action(key);
                         return;
@@ -411,23 +408,35 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
                 self.keys[key].active_combo = Some(candidate);
             }
             Kind::Up => {
+                let mut invalidate_cache = false;
                 for group in self.keys[key].iter_groups(&self.keys_groups) {
                     if self.groups[*group].is_active() {
+                        invalidate_cache = true;
                         self.masks -= self.groups[*group].mask_weight;
+                        close_active_combos(
+                            &mut self.groups[*group],
+                            &mut self.keys,
+                            &self.keys_combos,
+                            &mut self.events,
+                        );
                     }
-                    close_active_combos(
-                        &mut self.groups[*group],
-                        &self.keys,
-                        &self.keys_combos,
-                        &mut self.events,
-                    );
                     self.groups[*group].counter -= 1;
                 }
+
+                self.cache_counter = self.cache_counter.wrapping_add(invalidate_cache as i32);
+
                 if self.keys[key].open
                     && let Some(action) = self.keys[key]
-                        .active_combo
-                        .map(|i| self.keys[key].get_combo(i, &self.keys_combos).action)
-                        .or(self.keys[key].action)
+                    .active_combo
+                    .map(|i| {
+                        self.groups[self.keys[key]
+                            .get_combo(i, &self.keys_combos)
+                            .modifier_group]
+                            .active_combos
+                            .remove(key);
+                        self.keys[key].get_combo(i, &self.keys_combos).action
+                    })
+                    .or(self.keys[key].action)
                 {
                     if !self.keys[key].is_immediate() {
                         self.events.push_back(Event {
@@ -465,7 +474,7 @@ impl<A: Keycode, Z: Keycode> ComboHandler<A, Z> {
 
 fn close_active_combos<Z: Keycode>(
     group: &mut Group,
-    keys: &[Key<Z>],
+    keys: &mut [Key<Z>],
     keys_combos: &[Combo<Z>],
     events: &mut VecDeque<Event<Z>>,
 ) {
@@ -476,6 +485,7 @@ fn close_active_combos<Z: Keycode>(
             && let Some(action) = keys[key].active_combo
         {
             // ignore modifiers with keyup action
+            keys[key].open = false;
             events.push_back(Event {
                 keycode: keys[key].get_combo(action, keys_combos).action,
                 kind: Kind::Up,
