@@ -9,6 +9,7 @@ use sdl3::keyboard::Keycode;
 use sdl3::video::WindowFlags;
 use std::convert::Into;
 use std::fs::File;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config: Config = serde_yaml::from_reader(File::open("example.yaml")?)?;
@@ -24,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let gamepad_subsystem = sdl_context.gamepad()?;
 
     hint::set("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");
-    let mut window = video_subsystem
+    let window = video_subsystem
         .window("Input Tracker", 100, 100)
         .set_flags(WindowFlags::ALWAYS_ON_TOP)
         .position_centered()
@@ -61,6 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ..
                 } => {
                     // println!("{timestamp}: {key} down on keyboard");
+                    let now = Instant::now();
                     let queue = combo_handler.handle(Event {
                         keycode: key.into(),
                         kind: types::Kind::Down,
@@ -79,12 +81,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ..
                 } => {
                     // println!("{timestamp}: {key} up on keyboard");
+                    let now = Instant::now();
                     let queue = combo_handler.handle(Event {
                         keycode: key.into(),
                         kind: types::Kind::Up,
                         value: 0,
                     });
-                    println!("{}", queue.len());
+                    let elapsed = now.elapsed();
+                    println!("elapsed: {}ms, events: {}", (elapsed.as_nanos() as f64) / 1000_000_f64, queue.len());
                     while let Some(event) = queue.pop_front() {
                         println!("{event:?}");
                     }
@@ -115,13 +119,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     timestamp,
                 } => {
                     // println!("{timestamp}: {button:?} down on {which}");
-
+                    let now = Instant::now();
                     let queue = combo_handler.handle(Event {
                         keycode: button.into(),
                         kind: types::Kind::Down,
                         value: 0,
                     });
-                    println!("{}", queue.len());
+                    let elapsed = now.elapsed();
+                    println!("elapsed: {}ms, events: {}", (elapsed.as_nanos() as f64) / 1000_000_f64, queue.len());
                     while let Some(event) = queue.pop_front() {
                         println!("{event:?}");
                     }
@@ -133,13 +138,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     timestamp,
                 } => {
                     // println!("{timestamp}: {button:?} up on {which}");
-
+                    let now = Instant::now();
                     let queue = combo_handler.handle(Event {
                         keycode: button.into(),
                         kind: types::Kind::Up,
                         value: 0,
                     });
-                    println!("{}", queue.len());
+                    let elapsed = now.elapsed();
+                    println!("elapsed: {}ms, events: {}", (elapsed.as_nanos() as f64) / 1000_000_f64, queue.len());
                     while let Some(event) = queue.pop_front() {
                         println!("{event:?}");
                     }
@@ -147,12 +153,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 event::Event::ControllerAxisMotion { axis, value, .. } => {
                     //println!("{timestamp}: {axis:?}={value:?} on {which}");
+                    let now = Instant::now();
                     let queue = combo_handler.handle(Event {
                         keycode: axis.into(),
                         kind: types::Kind::Axis,
                         value,
                     });
-                    println!("{}", queue.len());
+                    let elapsed = now.elapsed();
+                    println!("elapsed: {}ms, events: {}", (elapsed.as_nanos() as f64) / 1000_000_f64, queue.len());
                     while let Some(event) = queue.pop_front() {
                         println!("{event:?}");
                     }

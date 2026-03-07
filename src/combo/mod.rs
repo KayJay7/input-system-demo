@@ -277,27 +277,17 @@ impl ComboHandler {
                         if self.groups[*group].keys.len() > 1 {
                             // singletons do not close themselves
                             for key in self.groups[*group].iter_keys(&self.groups_keys) {
-                                // close all modifier keys
-                                self.keys[*key].open = false;
+                                // close all delayed modifier keys
+                                self.keys[*key].open &= self.keys[*key].is_immediate();
                             }
                         }
                         for group in self.groups[*group].iter_pred(&self.groups_pred) {
-                            for key in self.groups[*group].active_combos.drain() {
-                                // terminate the actions it modified
-                                // keyup modifiers did not produce a keydown yet
-                                if let Some(action) = self.keys[key].active_combo
-                                    && self.keys[key].is_immediate()
-                                {
-                                    // ignore modifiers with keyup action
-                                    self.events.push_back(Event {
-                                        keycode: self.keys[key]
-                                            .get_combo(action, &self.keys_combos)
-                                            .action,
-                                        kind: Kind::Up,
-                                        value: 0,
-                                    });
-                                }
-                            }
+                            close_active_combos(
+                                &mut self.groups[*group],
+                                &self.keys,
+                                &self.keys_combos,
+                                &mut self.events,
+                            );
                         }
                     }
                 }
@@ -311,8 +301,6 @@ impl ComboHandler {
                     return &mut self.events;
                 }
 
-                // let was_open = self.keys[key].open || !self.is_masking();
-                // self.keys[key].open = false;
                 self.keys[key].open &= !self.is_masking();
 
                 if self.keys[key].cache_counter == self.cache_counter {
@@ -342,18 +330,7 @@ impl ComboHandler {
                     .unwrap_or(combos);
                 if i == combos {
                     // not modified
-                    if !self.is_masking()
-                        && self.keys[key].is_immediate()
-                        && let Some(action) = self.keys[key].action
-                    {
-                        self.events.push_back(Event {
-                            keycode: action,
-                            kind: Kind::Down,
-                            value: 0,
-                        });
-                        self.keys[key].active_combo = None;
-                        self.keys[key].open = true;
-                    }
+                    self.maybe_action(key);
                     return &mut self.events;
                 }
 
@@ -372,18 +349,7 @@ impl ComboHandler {
                                 .get_combo(candidate, &self.keys_combos)
                                 .modifier_group])
                     {
-                        if !self.is_masking()
-                            && self.keys[key].is_immediate()
-                            && let Some(action) = self.keys[key].action
-                        {
-                            self.events.push_back(Event {
-                                keycode: action,
-                                kind: Kind::Down,
-                                value: 0,
-                            });
-                            self.keys[key].active_combo = None;
-                            self.keys[key].open = true;
-                        }
+                        self.maybe_action(key);
                         return &mut self.events;
                     }
                     i += 1;
@@ -438,20 +404,12 @@ impl ComboHandler {
                     if self.groups[*group].is_active() {
                         self.masks -= self.groups[*group].mask_weight;
                     }
-                    for key in self.groups[*group].active_combos.drain() {
-                        // terminate the actions it modified
-                        // keyup modifiers did not produce a keydown yet
-                        if self.keys[key].is_immediate()
-                            && let Some(action) = self.keys[key].active_combo
-                        {
-                            // ignore modifiers with keyup action
-                            self.events.push_back(Event {
-                                keycode: self.keys[key].get_combo(action, &self.keys_combos).action,
-                                kind: Kind::Up,
-                                value: 0,
-                            });
-                        }
-                    }
+                    close_active_combos(
+                        &mut self.groups[*group],
+                        &self.keys,
+                        &self.keys_combos,
+                        &mut self.events,
+                    );
                     self.groups[*group].counter -= 1;
                 }
                 if self.keys[key].open
@@ -477,5 +435,42 @@ impl ComboHandler {
             Kind::Axis => {}
         }
         &mut self.events
+    }
+
+    fn maybe_action(&mut self, key: usize) {
+        if !self.is_masking()
+            && self.keys[key].is_immediate()
+            && let Some(action) = self.keys[key].action
+        {
+            self.events.push_back(Event {
+                keycode: action,
+                kind: Kind::Down,
+                value: 0,
+            });
+            self.keys[key].active_combo = None;
+            self.keys[key].open = true;
+        }
+    }
+}
+
+fn close_active_combos(
+    group: &mut Group,
+    keys: &[Key],
+    keys_combos: &[Combo],
+    events: &mut VecDeque<Event>,
+) {
+    for key in group.active_combos.drain() {
+        // terminate the actions it modified
+        // keyup modifiers did not produce a keydown yet
+        if keys[key].is_immediate()
+            && let Some(action) = keys[key].active_combo
+        {
+            // ignore modifiers with keyup action
+            events.push_back(Event {
+                keycode: keys[key].get_combo(action, keys_combos).action,
+                kind: Kind::Up,
+                value: 0,
+            });
+        }
     }
 }

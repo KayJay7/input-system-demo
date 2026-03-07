@@ -21,6 +21,7 @@ actions:
     immediate: true
     action: Q
   - key: LAlt
+#    immediate: true
     action: H
   - key: A
     action: Z
