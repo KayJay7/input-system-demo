@@ -10,42 +10,42 @@ mod types;
 
 const EVENT_BUFFER_WARMUP: usize = 16;
 
-pub struct ComboHandler {
-    domain: FzScalarMap<Keycode, usize>, // keycode to key index
-    keys: Box<[Key]>,                    // keys
-    keys_combos: Box<[Combo]>,           // optimization: packed key combos
+pub struct ComboHandler<T:Keycode, U:Keycode> {
+    domain: FzScalarMap<T, usize>, // keycode to key index
+    keys: Box<[Key<U>]>,                    // keys
+    keys_combos: Box<[Combo<U>]>,           // optimization: packed key combos
     keys_groups: Box<[usize]>,           // optimization: packed key groups
     groups: Box<[Group]>,                // modifier groups graph
     groups_keys: Box<[usize]>,           // optimization: packed group keys
     groups_pred: Box<[usize]>,           // optimization: packed group pred
     groups_intersect: Box<[usize]>,      // optimization: packed group intersect
     masks: i32,                          // #active masks
-    events: VecDeque<Event>,             // output event queue
+    events: VecDeque<Event<U>>,             // output event queue
     cache_counter: i32,
 }
 
-impl ComboHandler {
+impl<T:Keycode, U:Keycode> ComboHandler<T, U> {
     #[inline]
     fn is_masking(&self) -> bool {
         self.masks > 0
     }
 
-    pub fn new(config: Config) -> ComboHandler {
+    pub fn new(config: Config<T, U>) -> ComboHandler<T, U> {
         #[derive(Default)]
-        struct MutKey {
-            action: Option<Keycode>,
-            combos: Vec<Combo>,
+        struct MutKey<V: Keycode> {
+            action: Option<V>,
+            combos: Vec<Combo<V>>,
             latching: bool,
             immediate: bool,
             groups: Vec<usize>,
         }
-        impl MutKey {
+        impl<V:Keycode> MutKey<V> {
             fn freeze(
                 mut self,
                 groups: &[Group],
-                keys_combos: &mut Vec<Combo>,
+                keys_combos: &mut Vec<Combo<V>>,
                 keys_groups: &mut Vec<usize>,
-            ) -> Key {
+            ) -> Key<V> {
                 self.combos.sort_unstable_by(|x, y| {
                     groups[y.modifier_group]
                         .size
@@ -117,7 +117,7 @@ impl ComboHandler {
         }
 
         // graph build
-        let (named_groups, groups): (HashMap<String, usize>, Vec<HashSet<Keycode>>) = config
+        let (named_groups, groups): (HashMap<String, usize>, Vec<HashSet<T>>) = config
             .modifiers
             .iter()
             .enumerate()
@@ -153,8 +153,8 @@ impl ComboHandler {
             }
         }
 
-        let mut domain: HashMap<Keycode, usize> = HashMap::new();
-        let mut temp_keys: Vec<MutKey> = vec![];
+        let mut domain: HashMap<T, usize> = HashMap::new();
+        let mut temp_keys: Vec<MutKey<U>> = vec![];
         // domain: populate modifiers
         for (i, group) in groups.into_iter().enumerate() {
             for keycode in group {
@@ -210,7 +210,7 @@ impl ComboHandler {
 
         // domain: populate action keys
         for action in config.actions.iter() {
-            let temp_key: &mut MutKey;
+            let temp_key: &mut MutKey<U>;
             if let Some(i) = domain.get(&action.key) {
                 temp_key = &mut temp_keys[*i];
             } else {
@@ -256,7 +256,7 @@ impl ComboHandler {
         }
     }
 
-    pub fn handle(&mut self, event: Event) -> &mut VecDeque<Event> {
+    pub fn handle(&mut self, event: Event<T>) -> &mut VecDeque<Event<U>> {
         let key = *if let Some(key) = self.domain.get(&event.keycode) {
             key
         } else {
@@ -453,11 +453,11 @@ impl ComboHandler {
     }
 }
 
-fn close_active_combos(
+fn close_active_combos<U: Keycode>(
     group: &mut Group,
-    keys: &[Key],
-    keys_combos: &[Combo],
-    events: &mut VecDeque<Event>,
+    keys: &[Key<U>],
+    keys_combos: &[Combo<U>],
+    events: &mut VecDeque<Event<U>>,
 ) {
     for key in group.active_combos.drain() {
         // terminate the actions it modified

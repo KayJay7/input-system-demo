@@ -19,36 +19,36 @@ modifiers:
 actions:
   - key: LCtrl
     immediate: true
-    action: Q
+    action: 1
   - key: LAlt
 #    immediate: true
-    action: H
+    action: 2
   - key: A
-    action: Z
+    action: 3
   - key: B
-    action: Y
+    action: 4
     modified:
       - modifier: Ctrl
-        action: X
+        action: 5
       - modifier: RCtrl
-        action: W
+        action: 6
       - modifier: CtrlAlt
-        action: V
+        action: 7
   - key: C
     modified:
       - modifier: CtrlAltShift
-        action: S
+        action: 8
   - key: D
     modified:
       - modifier: RCtrl
-        action: U
+        action: 9
   # conditional axis
   - key: RightX
     modified:
       - modifier: RCtrl
-        action: RightX
+        action: 10
   - key: LeftX
-    action: LeftX
+    action: 11
     modified:
       - modifier: RCtrl
-        action: LeftX
+        action: 12

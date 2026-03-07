@@ -11,8 +11,10 @@ use std::convert::Into;
 use std::fs::File;
 use std::time::Instant;
 
+mod sdl_keycode;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config: Config = serde_yaml::from_reader(File::open("example.yaml")?)?;
+    let config: Config<sdl_keycode::SdlKeycode,i32> = serde_yaml::from_reader(File::open("example.yaml")?)?;
     // serde_yaml::to_writer(File::create("out.yaml")?, &config)?;
     // return Ok(());
     config.validate()?;
